@@ -39,48 +39,19 @@ class MimeURL(URL):
 
 
 class HPage(HTMLPage):
-    def search_thumbs(self):
-        for link_el in self.doc.xpath('//a[.//img]'):
-            link = urljoin(self.url, link_el.attrib['href'])
-
-            imgs = link_el.xpath('.//img')
-            if len(imgs) != 1:
-                continue
-            img = urljoin(self.url, imgs[0].attrib['src'])
-
-            yield link, img
-
-    def search_big_images(self):
-        for img_el in self.doc.xpath('//img'):
-            img = urljoin(self.url, img_el.attrib['src'])
-
-            imgpage = self.browser.open(img).page
-            if not (isinstance(imgpage, IPage) and bigger_than(imgpage.size, args.min_image_size)):
-                continue
-
-            yield img
-
-    def search_big_image_old(self):
-        for img_el in self.doc.xpath('//img'):
-            img = urljoin(self.url, img_el.attrib['src'])
-
-            imgpage = self.browser.open(img).page
-            if not (isinstance(imgpage, IPage) and bigger_than(imgpage.size, args.min_image_size)):
-                continue
-
-            # found, now look if we're on a link to hi-res
-            links = img_el.xpath('./ancestor::a[@href]')
-            if len(links) != 1:
-                return img
-
-            link_el = links[0]
-            link = urljoin(self.url, link_el.attrib['href'])
-            logging.debug(f'[-] found higher res? {link} for {img}')
-            return img
-
     def search_big_image(self):
         for img_el in self.doc.xpath('//img'):
+            if 'src' not in img_el.attrib:
+                logging.debug(f'skipping img tag without a src attribute')
+                continue
+
             img = self._url_of(img_el, 'src')
+
+            link_el = self._container_link_el(img_el)
+            if link_el is not None:
+                link = self._url_of(link_el, 'href')
+                if self.browser.test_image_link(link):
+                    return link
 
             if self.browser.test_image_link(img):
                 return img
@@ -98,32 +69,38 @@ class HPage(HTMLPage):
     def _url_of(self, el, attr):
         return urljoin(self.url, el.attrib[attr])
 
-    def search_2(self):
+    def search_images(self):
         for img_el in self.doc.xpath('//img'):
             img = self._url_of(img_el, 'src')
 
             if not self.browser.test_min_thumb(img):
-                # doesn't even qualify as probable thumbnail
+                logging.debug(f'{img} does not even qualify as probable thumbnail')
                 continue
 
             link_el = self._container_link_el(img_el)
             if link_el is not None:
                 link = self._url_of(link_el, 'href')
                 if self.browser.test_image_link(link):
-                    # img is link to bigger image
+                    logging.debug(f'thumb {img} links directly to bigger image')
                     yield link
                     continue
 
                 sub = self.browser.get_page_image(link)
                 if sub:
-                    # img is link to page with bigger image
+                    logging.debug(f'thumb {img} links to page with bigger image')
                     yield sub
                     continue
 
             if self.browser.test_image_link(img):
-                # img is already the big image
+                logging.debug(f'{img} has no link and is an embedded big image')
                 yield img
                 continue
+
+    def go_xpath(self, xpath):
+        links = self.doc.xpath(xpath)
+        if links:
+            logging.info(f'visiting next page {links[0]}')
+            return self.browser.location(links[0])
 
 
 class IPage(RawPage):
@@ -134,16 +111,24 @@ class IPage(RawPage):
     def size(self):
         return self.doc.size
 
+    def download(self):
+        name_re = re.compile(r'/([^/?]+)(\?.*)?$')
+        with open(name_re.search(self.url)[1], 'wb') as fd:
+            logging.info(f'writing to {fd.name}')
+            fd.write(self.content)
 
-class MyBrowser(CacheMixin, PagesBrowser):
+
+class LurkBrowser(CacheMixin, PagesBrowser):
     BASEURL = 'http://example.com'
 
     hmatch = MimeURL('https?://.*', HPage, types=['text/html'])
     imatch = MimeURL('https?://.*', IPage, types=[re.compile('image/(?!svg).*')])
 
     def __init__(self, *args, **kwargs):
-        super(MyBrowser, self).__init__(*args, **kwargs)
+        super(LurkBrowser, self).__init__(*args, **kwargs)
         self.is_updatable = False  # cache requests without caring about ETags
+
+    open = CacheMixin.open_with_cache
 
     def test_min_thumb(self, url):
         if url.startswith('data:'):
@@ -164,45 +149,19 @@ class MyBrowser(CacheMixin, PagesBrowser):
         if isinstance(hpage, HPage):
             return hpage.search_big_image()
 
-    def crawl_old(self, url):
-        self.location(url)
+    def lurk(self, url):
+        if url:
+            logging.info(f'visiting page {url}')
+            self.location(url)
 
-        for link, thumb in self.page.search_thumbs():
-            logging.debug(f'[-] testing {thumb}')
-
-            thumbpage = self.open(thumb).page
-            if isinstance(thumbpage, IPage) and bigger_than(thumbpage.size, args.min_thumb_size):
-                logging.debug(f'[-] {link}')
-
-                imgpage = self.open(link).page
-                if isinstance(imgpage, IPage) and bigger_than(imgpage.size, args.min_image_size):
-                    logging.debug(f'[+] found direct {link}')
-                    self.download(link)
-                    continue
-                elif not isinstance(imgpage, HPage):
-                    logging.debug(f'[-] too bad, {link} was not html or image')
-                    continue
-
-                bigimg = imgpage.search_big_image()
-                if bigimg:
-                    logging.debug(f'[+] found {bigimg}')
-                    self.download(bigimg)
-
-        for img in self.page.search_big_images():
-            logging.debug(f'[+] found embedded {img}')
+        for img in self.page.search_images():
             self.download(img)
 
-    def crawl(self, url):
-        self.location(url)
-
-        for img in self.page.search_2():
-            self.download(img)
+    def go_xpath(self, xpath):
+        return self.page.go_xpath(xpath)
 
     def download(self, url):
-        name_re = re.compile(r'/([^/?]+)(\?.*)?$')
-        with open(name_re.search(url)[1], 'wb') as fd:
-            logging.info(f'writing to {fd.name}')
-            fd.write(self.open(url).content)
+        self.open(url).page.download()
 
 
 def bigger_than(test, expected):
@@ -228,11 +187,6 @@ def parse_cookie(cstr):
     return v[0], v[2]
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s %(message)s',
-)
-
 parser = ArgumentParser(
     formatter_class=ArgumentDefaultsHelpFormatter,
     description='Extract images from a page',
@@ -249,18 +203,31 @@ parser.add_argument(
 parser.add_argument(
     '--max-aspect-ratio', type=build_tuple_maker('[:/]'), default=(4, 1),
     help="Max ratio between width/height to skip banners, ads etc. "
-    "(and height/width for portrait format)",
+    "(or height/width if portrait format)",
     metavar='NUM:DENOM',
 )
-parser.add_argument('--cookie', type=parse_cookie)
+parser.add_argument(
+    '--cookie', dest='cookies', type=parse_cookie, action='append',
+    default=[],
+)
+parser.add_argument('--next-page-xpath')
+parser.add_argument('--debug', action='store_const', const=True)
 
 args = parser.parse_args()
 args.max_aspect_ratio = Fraction(*args.max_aspect_ratio)
 if args.max_aspect_ratio < 1:
     args.max_aspect_ratio = 1 / args.max_aspect_ratio
 
-b = MyBrowser()
-if args.cookie:
-    b.session.cookies[args.cookie[0]] = args.cookie[1]
+logging.basicConfig(
+    level=logging.DEBUG if args.debug else logging.INFO,
+    format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s %(message)s',
+)
 
-b.crawl(args.url)
+browser = LurkBrowser()
+for cookie in args.cookies:
+    browser.session.cookies[cookie[0]] = cookie[1]
+
+browser.lurk(args.url)
+if args.next_page_xpath:
+    while browser.go_xpath(args.next_page_xpath):
+        browser.lurk(None)
