@@ -223,21 +223,29 @@ parser.add_argument(
 parser.add_argument('--next-page-xpath')
 parser.add_argument('--debug', action='store_const', const=True)
 
-args = parser.parse_args()
-args.max_aspect_ratio = Fraction(*args.max_aspect_ratio)
-if args.max_aspect_ratio < 1:
-    args.max_aspect_ratio = 1 / args.max_aspect_ratio
 
-logging.basicConfig(
-    level=logging.DEBUG if args.debug else logging.INFO,
-    format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s %(message)s',
-)
+def main():
+    global args
 
-browser = LurkBrowser()
-for cookie in args.cookies:
-    browser.session.cookies[cookie[0]] = cookie[1]
+    args = parser.parse_args()
+    args.max_aspect_ratio = Fraction(*args.max_aspect_ratio)
+    if args.max_aspect_ratio < 1:
+        args.max_aspect_ratio = 1 / args.max_aspect_ratio
 
-browser.lurk(args.url)
-if args.next_page_xpath:
-    while browser.go_xpath(args.next_page_xpath):
-        browser.lurk(None)
+    logging.basicConfig(
+        level=logging.DEBUG if args.debug else logging.INFO,
+        format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s %(message)s',
+    )
+
+    browser = LurkBrowser()
+    for cookie in args.cookies:
+        browser.session.cookies[cookie[0]] = cookie[1]
+
+    browser.lurk(args.url)
+    if args.next_page_xpath:
+        while browser.go_xpath(args.next_page_xpath):
+            browser.lurk(None)
+
+
+if __name__ == '__main__':
+    main()
