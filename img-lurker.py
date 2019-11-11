@@ -2,7 +2,9 @@
 # license: Do What the Fuck You Want to Public License version 2
 # [http://wtfpl.net]
 
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from argparse import (
+    ArgumentParser, ArgumentDefaultsHelpFormatter, ArgumentTypeError,
+)
 from fractions import Fraction
 from io import BytesIO
 import logging
@@ -180,6 +182,9 @@ def build_tuple_maker(sep):
         m = re.fullmatch(fr'(\d+){sep}(\d+)', s)
         if m:
             return (int(m[1]), int(m[2]))
+        raise ArgumentTypeError(f'{s!r} is not in the expected format')
+
+    return arg2size
 
 
 def parse_cookie(cstr):
@@ -207,7 +212,7 @@ parser.add_argument(
     '--max-aspect-ratio', type=build_tuple_maker('[:/]'), default=(4, 1),
     help="Maximum ratio between width/height to skip logos, banners, ads etc. "
     "(or height/width if portrait format)",
-    metavar='NUM:DENOM',
+    metavar='NUMER/DENOM',
 )
 parser.add_argument(
     '--cookie', dest='cookies', type=parse_cookie, action='append',
