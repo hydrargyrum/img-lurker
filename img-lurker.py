@@ -7,6 +7,7 @@ from argparse import (
 )
 from fractions import Fraction
 from io import BytesIO
+import json
 import logging
 import re
 from urllib.parse import urljoin
@@ -79,6 +80,10 @@ class HPage(HTMLPage):
 
             img = self._url_of(img_el, 'src')
 
+            if self.browser.is_visited(img):
+                logging.debug(f'{img} has already been visited')
+                continue
+
             if not self.browser.test_min_thumb(img):
                 logging.debug(f'{img} does not even qualify as probable thumbnail')
                 continue
@@ -86,6 +91,11 @@ class HPage(HTMLPage):
             link_el = self._container_link_el(img_el)
             if link_el is not None:
                 link = self._url_of(link_el, 'href')
+
+                if self.browser.is_visited(link):
+                    logging.debug(f'{link} has already been visited')
+                    continue
+
                 if self.browser.test_image_link(link):
                     logging.debug(f'thumb {img} links directly to bigger image')
                     yield link
@@ -105,7 +115,7 @@ class HPage(HTMLPage):
     def go_xpath(self, xpath):
         links = self.doc.xpath(xpath)
         if links:
-            logging.info(f'visiting next page {links[0]}')
+            logging.info(f'visiting next index page {links[0]}')
             return self.browser.location(links[0])
 
 
@@ -133,9 +143,10 @@ class LurkBrowser(CacheMixin, PagesBrowser):
     def __init__(self, *args, **kwargs):
         super(LurkBrowser, self).__init__(*args, **kwargs)
         self.is_updatable = False  # cache requests without caring about ETags
+        self.history = []
+        self.page_visited = []
 
-    open = CacheMixin.open_with_cache
-
+    # helpers called by pages
     def test_min_thumb(self, url):
         if url.startswith('data:'):
             return
@@ -155,19 +166,42 @@ class LurkBrowser(CacheMixin, PagesBrowser):
         if isinstance(hpage, HPage):
             return hpage.search_big_image()
 
+    # main crawler
     def lurk(self, url):
         if url:
-            logging.info(f'visiting page {url}')
+            logging.info(f'visiting index page {url}')
             self.location(url)
 
         for img in self.page.search_images():
             self.download(img)
+
+            # mark pages as visited when we're sure it's downloaded
+            self.push_history()
 
     def go_xpath(self, xpath):
         return self.page.go_xpath(xpath)
 
     def download(self, url):
         self.open(url).page.download()
+
+    # overridden
+    def open(self, url, *args, **kwargs):
+        ret = self.open_with_cache(url, *args, **kwargs)
+        self.page_visited.append(ret.url)
+        return ret
+
+    # history methods
+    def is_visited(self, url):
+        return url in self.history
+
+    def push_history(self):
+        self.history += self.page_visited
+        self.page_visited = []
+
+    def save_history(self, filename):
+        logging.debug(f'saving history to {filename}')
+        with open(filename, 'w') as fd:
+            json.dump(self.history, fd)
 
 
 def bigger_than(test, expected):
@@ -226,6 +260,7 @@ parser.add_argument(
 )
 parser.add_argument('--next-page-xpath')
 parser.add_argument('--debug', action='store_const', const=True)
+parser.add_argument('--history-file')
 
 
 def main():
@@ -245,10 +280,23 @@ def main():
     for cookie in args.cookies:
         browser.session.cookies[cookie[0]] = cookie[1]
 
-    browser.lurk(args.url)
-    if args.next_page_xpath:
-        while browser.go_xpath(args.next_page_xpath):
-            browser.lurk(None)
+    if args.history_file:
+        logging.debug(f'loading history from {args.history_file}')
+        try:
+            with open(args.history_file) as fd:
+                browser.history = json.load(fd)
+        except FileNotFoundError:
+            pass
+
+    try:
+        browser.lurk(args.url)
+        if args.next_page_xpath:
+            while browser.go_xpath(args.next_page_xpath):
+                browser.lurk(None)
+    except KeyboardInterrupt:
+        logging.warning('program interrupted')
+    if args.history_file:
+        browser.save_history(args.history_file)
 
 
 if __name__ == '__main__':
