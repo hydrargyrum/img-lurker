@@ -73,6 +73,10 @@ class HPage(HTMLPage):
 
     def search_images(self):
         for img_el in self.doc.xpath('//img'):
+            if 'src' not in img_el.attrib:
+                logging.debug(f'skipping img tag without a src attribute')
+                continue
+
             img = self._url_of(img_el, 'src')
 
             if not self.browser.test_min_thumb(img):
