@@ -189,26 +189,31 @@ def parse_cookie(cstr):
 
 parser = ArgumentParser(
     formatter_class=ArgumentDefaultsHelpFormatter,
-    description='Extract images from a page',
+    description='Downloads images from a page (even if indirectly linked)',
 )
 parser.add_argument('url')
 parser.add_argument(
     '--min-thumb-size', type=build_tuple_maker('x'), default=(128, 128),
     metavar='WIDTHxHEIGHT',
+    help='Minimum dimensions to consider an image as a thumbnail link '
+    '(linking to the bigger version)',
 )
 parser.add_argument(
     '--min-image-size', type=build_tuple_maker('x'), default=(400, 400),
     metavar='WIDTHxHEIGHT',
+    help='Minimum image dimensions to be considered worthy',
 )
 parser.add_argument(
     '--max-aspect-ratio', type=build_tuple_maker('[:/]'), default=(4, 1),
-    help="Max ratio between width/height to skip banners, ads etc. "
+    help="Maximum ratio between width/height to skip logos, banners, ads etc. "
     "(or height/width if portrait format)",
     metavar='NUM:DENOM',
 )
 parser.add_argument(
     '--cookie', dest='cookies', type=parse_cookie, action='append',
     default=[],
+    help='Inject cookies (KEY=VALUE) if required by website '
+    '(for example "over18=1" on reddit)',
 )
 parser.add_argument('--next-page-xpath')
 parser.add_argument('--debug', action='store_const', const=True)
