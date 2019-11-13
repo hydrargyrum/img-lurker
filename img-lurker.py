@@ -9,8 +9,9 @@ from fractions import Fraction
 from io import BytesIO
 import json
 import logging
+from pathlib import Path
 import re
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 from PIL import Image
 from weboob.browser import PagesBrowser, URL
@@ -127,9 +128,24 @@ class IPage(RawPage):
     def size(self):
         return self.doc.size
 
+    def find_unused(self, path):
+        stem = path.stem
+        suffix = path.suffix
+
+        counter = 1
+        while path.exists():
+            path = path.with_name(f'{stem}-{counter}{suffix}')
+            logging.debug(f'file already taken, trying {path}')
+            counter += 1
+
+            assert counter < 1000, 'whoops, are there so many files?'
+
+        return path
+
     def download(self):
-        name_re = re.compile(r'/([^/?]+)(\?.*)?$')
-        with open(name_re.search(self.url)[1], 'wb') as fd:
+        url_path = Path(urlparse(self.url).path)
+        dl_path = self.find_unused(Path(url_path.name))
+        with dl_path.open('wb') as fd:
             logging.info(f'writing to {fd.name}')
             fd.write(self.content)
 
