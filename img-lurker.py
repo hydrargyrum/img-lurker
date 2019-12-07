@@ -149,12 +149,12 @@ class IPage(RawPage):
         if not ext:
             logging.debug(f'could not find extension for mime {content_type}')
             return path
-        ext = ext.lstrip('.')
+        # ext already contains a leading dot
 
         if not path.suffix or path.suffix.isdigit() or len(path.suffix) > 4:
             # current suffix might not be the extension but may contain
             # meaningful info we should keep
-            return Path(f'{path}.{ext}')
+            return Path(f'{path}{ext}')
         return path.with_suffix(ext)
 
     def find_unused(self, path):
