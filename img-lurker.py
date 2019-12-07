@@ -9,6 +9,7 @@ from fractions import Fraction
 from io import BytesIO
 import json
 import logging
+import mimetypes
 from pathlib import Path
 import re
 from urllib.parse import urljoin, urlparse
@@ -19,16 +20,23 @@ from weboob.browser.cache import CacheMixin
 from weboob.browser.pages import HTMLPage, RawPage
 
 
+def get_content_type(response):
+    response_type = response.headers.get('Content-Type')
+    if not response_type:
+        return
+    response_type = re.match('[^;]+', response_type)[0]  # ignore mime params
+    return response_type
+
+
 class MimeURL(URL):
     def __init__(self, *args, types, **kwargs):
         super(MimeURL, self).__init__(*args, **kwargs)
         self.types = types
 
     def handle(self, response):
-        response_type = response.headers.get('Content-Type')
+        response_type = get_content_type(response)
         if not response_type:
             return
-        response_type = re.match('[^;]+', response_type)[0]  # ignore mime params
 
         for accepted_type in self.types:
             if isinstance(accepted_type, str) and accepted_type == response_type:
@@ -135,6 +143,20 @@ class IPage(RawPage):
     def size(self):
         return self.doc.size
 
+    def set_extension(self, path):
+        content_type = get_content_type(self.response)
+        ext = mimetypes.guess_extension(content_type)
+        if not ext:
+            logging.debug(f'could not find extension for mime {content_type}')
+            return path
+        ext = ext.lstrip('.')
+
+        if not path.suffix or path.suffix.isdigit() or len(path.suffix) > 4:
+            # current suffix might not be the extension but may contain
+            # meaningful info we should keep
+            return Path(f'{path}.{ext}')
+        return path.with_suffix(ext)
+
     def find_unused(self, path):
         stem = path.stem
         suffix = path.suffix
@@ -151,7 +173,10 @@ class IPage(RawPage):
 
     def download(self):
         url_path = Path(urlparse(self.url).path)
-        dl_path = self.find_unused(Path(url_path.name))
+        dl_path = Path(url_path.name)
+        dl_path = self.set_extension(dl_path)
+        dl_path = self.find_unused(dl_path)
+
         with dl_path.open('wb') as fd:
             logging.info(f'writing to {fd.name}')
             fd.write(self.content)
