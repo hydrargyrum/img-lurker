@@ -43,13 +43,21 @@ class MimeURL(URL):
 
 
 class HPage(HTMLPage):
+    # some sites lazy load the images with js, the "src" is just a dummy
+    # fortunately, the real image is nearby
+    img_src_attributes = ('data-original', 'data-src', 'data-url', 'src')
+
+    def _find_first_img_attr(self, img_el):
+        for attr_name in self.img_src_attributes:
+            if attr_name in img_el.attrib:
+                return self._url_of(img_el, attr_name)
+
     def search_big_image(self):
         for img_el in self.doc.xpath('//img'):
-            if 'src' not in img_el.attrib:
+            img = self._find_first_img_attr(img_el)
+            if not img:
                 logging.debug(f'skipping img tag without a src attribute')
                 continue
-
-            img = self._url_of(img_el, 'src')
 
             link_el = self._container_link_el(img_el)
             if link_el is not None:
@@ -75,11 +83,10 @@ class HPage(HTMLPage):
 
     def search_images(self):
         for img_el in self.doc.xpath('//img'):
-            if 'src' not in img_el.attrib:
+            img = self._find_first_img_attr(img_el)
+            if not img:
                 logging.debug(f'skipping img tag without a src attribute')
                 continue
-
-            img = self._url_of(img_el, 'src')
 
             if self.browser.is_visited(img):
                 logging.debug(f'{img} has already been visited')
