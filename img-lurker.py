@@ -18,6 +18,7 @@ from PIL import Image
 from weboob.browser import PagesBrowser, URL
 from weboob.browser.cache import CacheMixin
 from weboob.browser.pages import HTMLPage, RawPage
+from requests.exceptions import HTTPError
 
 
 def get_content_type(response):
@@ -217,7 +218,10 @@ class LurkBrowser(CacheMixin, PagesBrowser):
         if url.startswith('data:'):
             return
 
-        imgpage = self.open(url).page
+        try:
+            imgpage = self.open(url).page
+        except HTTPError:
+            return
         if not isinstance(imgpage, IPage):
             logging.debug(f'{url} is not an image')
             return False
