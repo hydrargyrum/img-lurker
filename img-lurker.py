@@ -70,6 +70,9 @@ class HPage(HTMLPage):
             link_el = self._container_link_el(img_el)
             if link_el is not None:
                 link = self._url_of(link_el, 'href')
+
+                logging.debug(f'testing {link} as target for {img}')
+
                 if self.browser.test_image_link(link):
                     return link
 
@@ -95,6 +98,8 @@ class HPage(HTMLPage):
             if not img:
                 logging.debug(f'skipping img tag without a src attribute')
                 continue
+
+            logging.debug(f'investigating {img}...')
 
             if self.browser.is_visited(img):
                 logging.debug(f'{img} has already been visited')
@@ -200,14 +205,26 @@ class LurkBrowser(CacheMixin, PagesBrowser):
             return
 
         imgpage = self.open(url).page
-        return isinstance(imgpage, IPage) and bigger_than(imgpage.size, args.min_thumb_size)
+        if not isinstance(imgpage, IPage):
+            logging.debug(f'{url} is not an image')
+            return False
+        if not bigger_than(imgpage.size, args.min_thumb_size):
+            logging.debug(f'{url} is not big enough for a thumbnail')
+            return False
+        return True
 
     def test_image_link(self, url):
         if url.startswith('data:'):
             return
 
         imgpage = self.open(url).page
-        return isinstance(imgpage, IPage) and bigger_than(imgpage.size, args.min_image_size)
+        if not isinstance(imgpage, IPage):
+            logging.debug(f'{url} is not an image')
+            return False
+        if not bigger_than(imgpage.size, args.min_image_size):
+            logging.debug(f'{url} is not big enough for an image')
+            return False
+        return True
 
     def get_page_image(self, url):
         hpage = self.open(url).page
