@@ -15,9 +15,9 @@ import re
 from urllib.parse import urljoin, urlparse
 
 from PIL import Image
-from weboob.browser import PagesBrowser, URL
-from weboob.browser.cache import CacheMixin
-from weboob.browser.pages import HTMLPage, RawPage
+from woob.browser import PagesBrowser, URL
+from woob.browser.cache import CacheMixin
+from woob.browser.pages import HTMLPage, RawPage
 from requests.exceptions import HTTPError
 
 
