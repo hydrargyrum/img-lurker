@@ -23,12 +23,14 @@ Consider a site with following HTML:
         <img src="thumbnail2.jpg" />
     </a>
 
-img-lurker would download "fullimage1.jpg" and "fullimage2.jpg".
+img-lurker would download `fullimage1.jpg` and `fullimage2.jpg`.
 If instead the links point to other HTML pages containing the full size version
-of the images (for example "fullimage1.html" containing "fullimage1.jpg"),
-img-lurker would still find fullimage1.jpg by following the page links.
+of the images (for example `fullimage1.html` containing `fullimage1.jpg`),
+img-lurker would still find `fullimage1.jpg` by following the page links.
 
 ## Options
+
+### Cookies
 
     --cookie KEY=VALUE
 
@@ -36,6 +38,8 @@ Inject a specific cookie, which might be required to visit some restricted
 access pages. For example, some subreddits require you to pass the cookie "over18=1".
 
 The option can be passed several times to inject multiple cookies.
+
+### Pagination
 
     --next-page-xpath HTML_XPATH
 
@@ -49,6 +53,8 @@ will follow the link pointed to by `HTML_XPATH` and repeat on the next page.
 Warning: this can issue a lot of traffic for huge galleries. Be cautious or you
 might get blocked by the website.
 
+### Stop/resume
+
     --history-file FILE
 
 Mark all downloaded images URLs in this file and avoid redownloading URLs
@@ -59,11 +65,14 @@ the gallery has received fresh images. Also useful if you use
 a pause (minutes? hours? days?) then restart img-lurker: the history file will
 help it resume where it was interrupted.
 
-This makes the assumption that each image has a URL that is unique (the image
-URL always have the same URL, e.g. no varying tokens, etc.) and
-conversely (the URLs will not point to another image at some point, e.g. the
-images are NOT numbered in ascending order (else "1.jpg" would point to
-different images over time)).
+This makes the assumption that:
+
+- each image will always have the same URL, e.g. no varying tokens/timestamps in the URL, etc.
+- conversely, an URL will always point to the same image, it will not point to another image at some point, e.g. the
+images are NOT numbered in ascending order (else `1.jpg` would point to
+different images over time).
+
+### Tell apart thumbnails from "big images" to download only the latter
 
     --min-thumb-size WIDTHxHEIGHT
     --min-image-size WIDTHxHEIGHT
@@ -91,15 +100,17 @@ A photo is rarely square but is almost never thin like 4:1, except panoramas, so
 configure this option if you intend to download panoramas for example.
 The default value is `--max-aspect-ratio=4:1`.
 
+### Debug
+
     --debug
 
 Debug log.
 
-## Limits
+## Limitations
 
-img-lurker will not interpret javascript, though it has specific hints to detect
+- img-lurker will not interpret javascript, though it has specific hints to detect
 lazy-loaded images, so it might not work on sites like instagram.
-img-lurker will not open iframes, so it will fail to download a few images from
+- img-lurker will not open iframes, so it will fail to download a few images from
 reddit.
-img-lurker does not crawl a site and does not support nested galleries, it only
+- img-lurker does not crawl a site and does not support nested galleries, it only
 takes one gallery and expects it to contain the images desired.
