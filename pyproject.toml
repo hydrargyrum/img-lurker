@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "img-lurker"
+dynamic = ["version"]
+description = "Web gallery downloader"
+readme = "README.md"
+license = "WTFPL"
+requires-python = ">=3.6"
+keywords = [
+    "image",
+    "photo",
+    "spider",
+    "crawling",
+    "download",
+    "gallery",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: Public Domain",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Topic :: Internet",
+    "Topic :: Internet :: WWW/HTTP :: Browsers",
+    "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: System :: Archiving",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "woob",
+    "Pillow",
+]
+
+[[project.authors]]
+name = "Hg"
+email = "dev@indigo.re"
+
+[project.scripts]
+img-lurker = "img_lurker:main"
+
+[project.urls]
+Homepage = "https://gitlab.com/hydrargyrum/img-lurker/"
+
+[tool.hatch.version]
+path = "img_lurker.py"

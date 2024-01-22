@@ -21,6 +21,9 @@ from woob.browser.pages import HTMLPage, RawPage
 from requests.exceptions import HTTPError
 
 
+__version__ = "1.0.3"
+
+
 def get_content_type(response):
     response_type = response.headers.get('Content-Type')
     if not response_type:
